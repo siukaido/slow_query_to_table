@@ -1,4 +1,5 @@
 <?php
+require_once 'vendor/pear/console_table/Table.php';
 if (isset($argv[1]) === false) {
     die('plz input database name' . PHP_EOL);
 }
@@ -72,24 +73,8 @@ usort($box, function($a, $b) {
 });
 
 
-printf(
-    '+%5s+%5s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+' . PHP_EOL,
-    str_repeat('-', 5),
-    str_repeat('-', 5),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 100)
-);
-
-printf(
-    '|%5s|%5s|%10s|%10s|%10s|%10s|%10s|%10s|%10s|%10s|%10s|' . PHP_EOL,
+$tbl = new Console_Table();
+$tbl->setHeaders([
     'id',
     'count',
     'time(ave)',
@@ -101,26 +86,10 @@ printf(
     'rows(ave)',
     'rows(min)',
     'rows(max)'
-);
-printf(
-    '+%5s|%5s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+' . PHP_EOL,
-    str_repeat('-', 5),
-    str_repeat('-', 5),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10)
-);
-
+]);
 $i = 0;
 foreach ($box as $record) {
-    printf(
-        '|%5d|%5d|%10s|%10s|%10s|%10s|%10s|%10s|%10s|%10s|%10s|' . PHP_EOL,
+    $tbl->addRow([
         ++$i,
         $record['count'],
         round($record['query_time']['ave'], 4),
@@ -132,22 +101,9 @@ foreach ($box as $record) {
         round($record['row_examined']['ave']),
         round($record['row_examined']['min']),
         round($record['row_examined']['max'])
-    );
+    ]);
 }
-printf(
-    '+%5s+%5s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+%10s+' . PHP_EOL . PHP_EOL,
-    str_repeat('-', 5),
-    str_repeat('-', 5),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10),
-    str_repeat('-', 10)
-);
+echo $tbl->getTable() . PHP_EOL;
 
 echo "=== Queries === ".PHP_EOL;
 $i = 0;
