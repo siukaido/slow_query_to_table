@@ -1,26 +1,26 @@
 <?php
 require_once 'vendor/pear/console_table/Table.php';
-if (isset($argv[1]) === false) {
-    die('plz input database name' . PHP_EOL);
-}
 
-$working_dir = "./";
-if (isset($argv[2]) === true) {
-    $working_dir = $argv[2];
-}
-if (!preg_match('/\/$/', $working_dir)) {
-    $working_dir .= '/';
-}
+define('TMP_FILE_PATH', '/tmp/slow-query.log');
 
-exec("cat ${working_dir}mysql-slowquery* | grep -v timeline | grep -v 'use ${argv[1]}' | grep -v 'SET timestamp=' | grep SELECT -B 1 > /tmp/slow-query.log");
+try {
+    $cmd = Command::build(TMP_FILE_PATH);
+    echo $cmd . PHP_EOL.PHP_EOL;
+    system($cmd);
+    if (filesize(TMP_FILE_PATH) === 0) {
+        throw new RuntimeException('could not create tmp file, ' . TMP_FILE_PATH);
+    }
 
-$fp = fopen('/tmp/slow-query.log', 'r');
-if ($fp === false) {
-    die('could not file open' . PHP_EOL);
+    $fp = fopen(TMP_FILE_PATH, 'r');
+    if ($fp === false) {
+        throw new RuntimeException('could not open tmp file, ' . TMP_FILE_PATH);
+    }
+} catch (Exception $e) {
+    trigger_error($e->getMessage(), E_USER_WARNING);
+    return null;
 }
 
 $box = [];
-
 while ($meta = trim(fgets($fp))) {
     $query = trim(fgets($fp));
     $line = fgets($fp);
@@ -75,17 +75,10 @@ usort($box, function($a, $b) {
 
 $tbl = new Console_Table();
 $tbl->setHeaders([
-    'id',
-    'count',
-    'time(ave)',
-    'time(min)',
-    'time(max)',
-    'sent(ave)',
-    'sent(min)',
-    'sent(max)',
-    'rows(ave)',
-    'rows(min)',
-    'rows(max)'
+    'id', 'count',
+    'time(ave)', 'time(min)', 'time(max)',
+    'sent(ave)', 'sent(min)', 'sent(max)',
+    'rows(ave)', 'rows(min)', 'rows(max)',
 ]);
 $i = 0;
 foreach ($box as $record) {
@@ -111,4 +104,63 @@ foreach ($box as $record) {
     echo ++$i . ' : ' . $record['query'] . PHP_EOL . PHP_EOL;
 }
 
+fclose($fp);
 exec("rm -f /tmp/slow-query.log");
+
+
+//====================================================================
+//
+//  Command Class
+//
+//====================================================================
+class Command
+{
+    //====================================================================
+    //  public static method
+    //====================================================================
+    public static function build($tmp_file_path)
+    {
+        $options = getopt('v:', ['dir:']);
+
+        $cmd = sprintf("cat %s/mysql-slowquery*", self::_parseWorkingDir($options));
+
+        foreach (self::_parseExcludeWord($options) as $exclude_word) {
+            $cmd .= " | grep -v '${exclude_word}'";
+        }
+
+        $cmd .= " | grep -v 'SET timestamp=' | grep SELECT -B 1 > " . $tmp_file_path;
+        return $cmd;
+    }
+
+    //====================================================================
+    //  private static method
+    //====================================================================
+    private static function _parseExcludeWord($options)
+    {
+        $exclude_words = [];
+        if (isset($options['v']) === true) {
+            if (is_array($options['v'])) {
+                $exclude_words   = $options['v'];
+            } else {
+                $exclude_words[] = $options['v'];
+            }
+        }
+        return $exclude_words;
+    }
+
+    private static function _parseWorkingDir($options)
+    {
+        $working_dir = "./";
+        if (isset($options['dir']) === true) {
+            if (is_string($options['dir']) === false) {
+                throw new InvalidArugumentException('dir argument should be string, ' . gettype($options['dir']) . ' given');
+            }
+            $working_dir = $options['dir'];
+        }
+        $working_dir = realpath($working_dir);
+        if (is_dir($working_dir) === false) {
+            throw new RuntimeException('could not find directory, ' . $working_dir);
+        }
+        return $working_dir;
+    }
+}
